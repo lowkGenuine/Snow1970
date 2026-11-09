@@ -21,8 +21,8 @@ using System.Windows.Threading;
 using Forms = System.Windows.Forms;
 using Drawing = System.Drawing;
 
-[assembly: System.Reflection.AssemblyVersion("2.5.0.0")]
-[assembly: System.Reflection.AssemblyFileVersion("2.5.0.0")]
+[assembly: System.Reflection.AssemblyVersion("2.6.0.0")]
+[assembly: System.Reflection.AssemblyFileVersion("2.6.0.0")]
 
 namespace Snow1970
 {
@@ -200,7 +200,7 @@ namespace Snow1970
 
     internal sealed class Settings
     {
-        internal string Quality = "Auto";
+        internal string Quality = "Auto", Language = "ru";
         internal bool AllMonitors = true;
         internal bool StartEnabled = true;
         internal bool Interactive = true;
@@ -220,6 +220,7 @@ namespace Snow1970
                 if (pair.Length != 2) continue;
                 string k = pair[0].Trim().ToLowerInvariant(), v = pair[1].Trim();
                 double n; bool numeric = double.TryParse(v, NumberStyles.Float, CultureInfo.InvariantCulture, out n);
+                if (k == "language" && (v == "ru" || v == "en")) s.Language = v;
                 if (k == "quality" && (v == "Auto" || v == "Eco" || v == "Smooth")) s.Quality = v;
                 if (k == "monitors") s.AllMonitors = v.ToLowerInvariant() != "primary";
                 if (k == "startenabled") s.StartEnabled = v == "1";
@@ -244,6 +245,7 @@ namespace Snow1970
         internal void Save(string folder)
         {
             string data = "; Snow1970 settings\r\nQuality=" + Quality + "\r\nMonitors=" + (AllMonitors ? "All" : "Primary") + "\r\nStartEnabled=" + (StartEnabled ? "1" : "0") + "\r\nMaxFlakes=" + MaxFlakes + "\r\nFPS=" + Fps + "\r\nSpawnPerSecond=" + Rate.ToString(CultureInfo.InvariantCulture) + "\r\nGroundHeight=" + GroundHeight.ToString(CultureInfo.InvariantCulture) + "\r\nWindowHeight=" + WindowHeight.ToString(CultureInfo.InvariantCulture) + "\r\nIconHeight=" + IconHeight.ToString(CultureInfo.InvariantCulture) + "\r\n";
+            data += "Language=" + Language + "\r\n";
             data += "Decorations=" + (Decorations ? "1" : "0") + "\r\n";
             data += "Interactive=" + (Interactive ? "1" : "0") + "\r\n";
             data += "CursorInteraction=" + (CursorInteraction ? "1" : "0") + "\r\nGestureInteraction=" + (GestureInteraction ? "1" : "0") + "\r\nExcavator=" + (Excavator ? "1" : "0") + "\r\n";

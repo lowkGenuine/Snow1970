@@ -39,6 +39,15 @@ namespace Snow1970
             return tile;
         }
         internal static Pen Pen(Brush brush, double width) { Pen p = new Pen(brush, width); p.StartLineCap = PenLineCap.Round; p.EndLineCap = PenLineCap.Round; p.Freeze(); return p; }
+        internal static void SnowMark(DrawingContext dc, Point center, double radius, Pen pen)
+        {
+            for (int i = 0; i < 3; i++)
+            {
+                double angle = -Math.PI * .5 + i * Math.PI / 3;
+                Vector ray = new Vector(Math.Cos(angle), Math.Sin(angle));
+                dc.DrawLine(pen, center - ray * radius, center + ray * radius);
+            }
+        }
         internal static void Snowflake(DrawingContext dc, Point c, double r, Pen pen)
         {
             for (int i = 0; i < 3; i++)
@@ -81,7 +90,7 @@ namespace Snow1970
             dc.DrawRoundedRectangle(UiTheme.Get(this, on ? "OnTrack" : "OffTrack"), null, new Rect(5, 8, 56, 26), 13, 13);
             Point center = new Point(18 + t * 30, 21);
             dc.DrawEllipse(UiTheme.Get(this, on ? "OnKnob" : "OffKnob"), null, center, 10.5, 10.5);
-            if (on) Art.Snowflake(dc, center, 6.1, Art.Pen(UiTheme.Get(this, "OnGlyph"), .85));
+            if (on) Art.SnowMark(dc, center, 5.25, Art.Pen(UiTheme.Get(this, "OnGlyph"), 1.25));
             if (IsKeyboardFocused) dc.DrawRoundedRectangle(null, Art.FocusPen, new Rect(1.5, 4.5, 63, 33), 16.5, 16.5);
         }
     }
@@ -401,6 +410,7 @@ namespace Snow1970
                 HwndSource.FromHwnd(Handle).AddHook(Hotkey);
                 Native.RegisterHotKey(Handle, 1, 0x4003, 0x53); Native.RegisterHotKey(Handle, 2, 0x4003, 0x51);
             };
+            L10n.BindTree(this); L10n.BindTree(menu);
             Loaded += delegate { Anchor(); RefreshTheme(true); };
             Closed += delegate { Native.UnregisterHotKey(Handle, 1); Native.UnregisterHotKey(Handle, 2); };
         }
@@ -459,7 +469,7 @@ namespace Snow1970
         internal void Status(bool enabled, bool paused, string details)
         {
             Indicator.Opacity = !enabled ? .35 : paused ? .6 : 1;
-            Indicator.ToolTip = (!enabled ? "Снег выключен" : paused ? "Снег включён · рабочая область закрыта окнами" : "Снег идёт") + "\n" + details;
+            Indicator.ToolTip = L10n.T(!enabled ? "Снег выключен" : paused ? "Снег включён · рабочая область закрыта окнами" : "Снег идёт") + "\n" + details;
         }
     }
 
@@ -476,13 +486,26 @@ namespace Snow1970
         private Popup popup;
         internal event EventHandler Closed;
         internal bool IsOpen { get { return popup.IsOpen; } }
-        internal SettingsPanel(Settings settings, Action onChange, Action clear, Action exit)
+        internal SettingsPanel(Settings settings, Action onChange, Action clear, Action exit, Action languageChanged = null)
         {
-            config = settings; apply = onChange; UiTheme.Apply(this, true);
+            config = settings; apply = onChange; L10n.Use(config.Language); UiTheme.Apply(this, true);
             Width = 308; Foreground = Art.Text; FontFamily = new FontFamily("Segoe UI"); FontSize = 12;
             StackPanel stack = new StackPanel { Margin = new Thickness(17) };
             Content = new Border { Background = Art.Panel, BorderBrush = Art.Brush("#36404C"), BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(10), Child = new ScrollViewer { Content = stack, MaxHeight = Math.Max(300, SystemParameters.WorkArea.Height - 90), VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled } };
-            stack.Children.Add(new TextBlock { Text = "Настройки снега", FontSize = 15, FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 0, 0, 5) });
+            Grid heading = new Grid { Margin = new Thickness(0,0,0,7) };
+            heading.ColumnDefinitions.Add(new ColumnDefinition()); heading.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            heading.Children.Add(new TextBlock { Text = "Настройки снега", FontSize = 15, FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center });
+            StackPanel languages = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+            string[] codes = { "ru", "en" };
+            foreach (string language in codes)
+            {
+                string code = language;
+                RadioButton option = new RadioButton { Content = code.ToUpperInvariant(), GroupName = "InterfaceLanguage", IsChecked = config.Language == code, Width = 30, Height = 26, Margin = new Thickness(3,0,0,0), Cursor = Cursors.Hand, Background = Brushes.Transparent, BorderBrush = Art.Brush("#3C4754"), Foreground = Art.Text, Template = FlatTemplate(typeof(RadioButton), true), ToolTip = code == "en" ? "English" : "Русский" };
+                AutomationProperties.SetName(option, code == "en" ? "English" : "Русский");
+                option.Checked += delegate { config.Language = code; L10n.Use(code); Save(); if (languageChanged != null) languageChanged(); };
+                L10n.BindChoice(option, code); languages.Children.Add(option);
+            }
+            Grid.SetColumn(languages,1); heading.Children.Add(languages); stack.Children.Add(heading);
             debounce = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(230) };
             debounce.Tick += delegate { debounce.Stop(); apply(); Save(); };
             StackPanel interaction = Group(stack, "Взаимодействие", true);
@@ -530,7 +553,7 @@ namespace Snow1970
             Button quit = Button("Выход"); quit.Click += delegate { exit(); }; Grid.SetColumn(quit, 1); buttons.Children.Add(quit); stack.Children.Add(buttons);
             stack.Children.Add(new TextBlock { Text = "Ctrl+Alt+S — снег     Ctrl+Alt+Q — выход", Foreground = Art.Muted, FontSize = 10, Margin = new Thickness(0, 12, 0, 0) });
             popup = new Popup { Child = this, AllowsTransparency = true, StaysOpen = false, Placement = PlacementMode.Bottom, VerticalOffset = 7, HorizontalOffset = -280, PopupAnimation = PopupAnimation.None };
-            UiTheme.BindTree(this);
+            UiTheme.BindTree(this); L10n.BindTree(this);
             popup.Closed += delegate { debounce.Stop(); apply(); Save(); if (Closed != null) Closed(this, EventArgs.Empty); };
             PreviewKeyDown += delegate(object sender, KeyEventArgs e) { if (e.Key == Key.Escape) { Close(); e.Handled = true; } };
         }
@@ -596,7 +619,7 @@ namespace Snow1970
         private void Save()
         {
             try { config.Save(Program.Folder); }
-            catch (Exception e) { MessageBox.Show("Не удалось сохранить настройки: " + e.Message, "Snow1970"); }
+            catch (Exception e) { MessageBox.Show(L10n.T("Не удалось сохранить настройки: ") + e.Message, "Snow1970"); }
         }
         private void Changed() { debounce.Stop(); debounce.Start(); }
         private static void Label(StackPanel stack, string text) { stack.Children.Add(new TextBlock { Text = text, Margin = new Thickness(0, 0, 0, 6) }); }
@@ -609,7 +632,8 @@ namespace Snow1970
             slider.IsMoveToPointEnabled = true;
             slider.Template = SliderStyle;
             AutomationProperties.SetName(slider, title);
-            slider.ValueChanged += delegate { number.Text = Math.Round(slider.Value) + suffix; change(slider.Value); }; stack.Children.Add(slider);
+            L10n.BindNumber(number, slider, suffix);
+            slider.ValueChanged += delegate { change(slider.Value); }; stack.Children.Add(slider);
         }
     }
 
@@ -648,7 +672,7 @@ namespace Snow1970
         private Forms.NotifyIcon tray;
         internal Controller(Settings config)
         {
-            Config = config; SetQuality();
+            Config = config; L10n.Use(Config.Language); SetQuality();
             ThreadPool.QueueUserWorkItem(delegate { try { DecorationArt.Warm(); ExcavatorArt.Warm(); } catch { } });
             Bar = new Toolbar(); Bar.ToggleSnow = Enable; Bar.OpenSettings = OpenSettings;
             Bar.Tractor.IsChecked = Config.Excavator;
@@ -665,7 +689,7 @@ namespace Snow1970
             menu.Items.Add("Настройки", null, delegate { Bar.Dispatcher.BeginInvoke(new Action(OpenSettings)); });
             menu.Items.Add("Вернуть панель", null, delegate { Bar.Dispatcher.BeginInvoke(new Action(Bar.Anchor)); });
             menu.Items.Add("Выход", null, delegate { Bar.Dispatcher.BeginInvoke(new Action(delegate { Application.Current.Shutdown(); })); });
-            tray.ContextMenuStrip = menu; tray.DoubleClick += delegate { Bar.Dispatcher.BeginInvoke(new Action(OpenSettings)); };
+            tray.ContextMenuStrip = menu; UpdateLanguage(); tray.DoubleClick += delegate { Bar.Dispatcher.BeginInvoke(new Action(OpenSettings)); };
             iconThread = new Thread(IconLoop) { IsBackground = true, Name = "Desktop icon geometry" }; iconThread.Start();
             lastCpu = process.TotalProcessorTime;
             moveCallback = SupportMoved;
@@ -738,7 +762,7 @@ namespace Snow1970
         private void OpenSettings()
         {
             if (settingsWindow != null && settingsWindow.IsOpen) { settingsWindow.Close(); return; }
-            settingsWindow = new SettingsPanel(Config, ApplySettings, Clear, delegate { Application.Current.Shutdown(); });
+            settingsWindow = new SettingsPanel(Config, ApplySettings, Clear, delegate { Application.Current.Shutdown(); }, UpdateLanguage);
             settingsWindow.Closed += delegate { settingsWindow = null; }; settingsWindow.Show(Bar.SettingsAnchor);
         }
         private void ApplySettings()
@@ -917,7 +941,20 @@ namespace Snow1970
             Invalidate();
         }
         private void Invalidate() { foreach (SnowLayer layer in Layers) layer.DrawFrame(); }
-        private void UpdateStatus() { if (Bar != null) Bar.Status(Enabled, paused, (Config.SnowOnIcons ? iconStatus : "Снег на значках выключен") + "\nЧастота экрана: " + fps + " Гц · лимит " + particleBudget + " снежинок"); }
+        private void UpdateLanguage()
+        {
+            if (tray != null)
+            {
+                tray.Text = L10n.T("Snow1970 — снег");
+                string[] captions = { "Снег: включить / выключить", "Настройки", "Вернуть панель", "Выход" };
+                for (int i = 0; i < captions.Length; i++) tray.ContextMenuStrip.Items[i].Text = L10n.T(captions[i]);
+            }
+            UpdateStatus();
+        }
+        private void UpdateStatus()
+        {
+            if (Bar != null) Bar.Status(Enabled, paused, L10n.T(Config.SnowOnIcons ? iconStatus : "Снег на значках выключен") + "\n" + L10n.Format("Частота экрана: {0} Гц · лимит {1} снежинок", fps, particleBudget));
+        }
         public void Dispose()
         {
             if (disposed) return;
@@ -986,24 +1023,25 @@ namespace Snow1970
                 if (args.Length > 0 && args[0] == "--preview") { Checks.Preview(args.Length > 1 ? args[1] : Path.Combine(Folder, "Preview.png")); return; }
                 if (args.Length > 0 && args[0] == "--renderer-check") { Checks.RendererProbe(args.Length > 1 ? args[1] : Folder); return; }
                 if (args.Length > 0 && args[0] == "--appearance") { Checks.Appearance(args.Length > 1 ? args[1] : Folder); return; }
+                L10n.Use(Settings.Read(Folder).Language);
                 bool replace = Array.IndexOf(args, "--keep-existing") < 0;
                 if (replace) ClosePrevious();
                 using (FileStream lease = AcquireLease(replace))
                 {
-                if (lease == null) { MessageBox.Show("Snow1970 уже работает. Второй снежный слой не запущен.", "Snow1970"); return; }
+                if (lease == null) { MessageBox.Show(L10n.T("Snow1970 уже работает. Второй снежный слой не запущен."), "Snow1970"); return; }
                 using (Mutex mutex = new Mutex(false, "Local\\Snow1970.Portable"))
                 {
                     bool owns;
                     try { owns = mutex.WaitOne(replace ? 5000 : 0); }
                     catch (AbandonedMutexException) { owns = true; }
-                    if (!owns) { MessageBox.Show("Snow1970 уже запущен. Закройте прежнюю версию через её меню или Ctrl+Alt+Q, затем откройте новую.", "Snow1970"); return; }
+                    if (!owns) { MessageBox.Show(L10n.T("Snow1970 уже запущен. Закройте прежнюю версию через её меню или Ctrl+Alt+Q, затем откройте новую."), "Snow1970"); return; }
                     try { Process.GetCurrentProcess().PriorityClass = ProcessPriorityClass.BelowNormal; } catch { }
                     Application app = new Application { ShutdownMode = ShutdownMode.OnExplicitShutdown };
                     Controller controller = null;
                     app.DispatcherUnhandledException += delegate(object sender, DispatcherUnhandledExceptionEventArgs e)
                     {
                         Log(e.Exception); e.Handled = true;
-                        MessageBox.Show("Snow1970 остановлен. Подробности: Snow1970.log рядом с программой.", "Snow1970"); app.Shutdown(1);
+                        MessageBox.Show(L10n.T("Snow1970 остановлен. Подробности: Snow1970.log рядом с программой."), "Snow1970"); app.Shutdown(1);
                     };
                     app.Exit += delegate { if (controller != null) controller.Dispose(); };
                     try
@@ -1024,7 +1062,7 @@ namespace Snow1970
                 }
                 }
             }
-            catch (Exception e) { Log(e); MessageBox.Show("Не удалось запустить Snow1970: " + e.Message, "Snow1970"); }
+            catch (Exception e) { Log(e); MessageBox.Show(L10n.T("Не удалось запустить Snow1970: ") + e.Message, "Snow1970"); }
         }
         private static void Log(Exception e) { try { File.AppendAllText(Path.Combine(Folder, "Snow1970.log"), DateTime.Now.ToString("s") + " " + e + Environment.NewLine); } catch { } }
     }

@@ -1,7 +1,7 @@
 param([switch]$BuildOnly)
 $ErrorActionPreference = 'Stop'
 $base = $PSScriptRoot
-$sources = @('Snow1970.cs', 'Snow1970.Collision.cs', 'Snow1970.Excavator.cs', 'Snow1970.Decorations.cs', 'Snow1970.Composition.cs', 'Snow1970.UI.cs', 'Snow1970.Theme.cs', 'Snow1970.Checks.cs') | ForEach-Object { Join-Path $base $_ }
+$sources = @('Snow1970.cs', 'Snow1970.Collision.cs', 'Snow1970.Excavator.cs', 'Snow1970.Decorations.cs', 'Snow1970.Composition.cs', 'Snow1970.UI.cs', 'Snow1970.Theme.cs', 'Snow1970.Text.cs', 'Snow1970.Checks.cs') | ForEach-Object { Join-Path $base $_ }
 $buildLock = $null
 $locked = $false
 try {

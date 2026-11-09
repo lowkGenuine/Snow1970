@@ -5,6 +5,7 @@ using System.Globalization;
 using System.IO;
 using System.Text;
 using System.Windows;
+using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
@@ -335,6 +336,7 @@ namespace Snow1970
                 RefinementChecks(report);
                 After23Checks(report, folder);
                 ThemeChecks(report, folder);
+                LanguageChecks(report, folder);
                 report.AppendLine("ALL " + passed + " CHECKS PASSED");
                 File.WriteAllText(Path.Combine(folder, "test-results.txt"), report.ToString(), Encoding.UTF8);
             }
@@ -576,6 +578,35 @@ namespace Snow1970
                 g.DrawString("Светлый фон",title,System.Drawing.Brushes.Black,18,12);g.DrawString("Темный фон",title,System.Drawing.Brushes.WhiteSmoke,348,12);
                 g.DrawImageUnscaled(lightBar,18,40);g.DrawImageUnscaled(darkBar,348,40);
                 g.DrawImageUnscaled(light,11,90);g.DrawImageUnscaled(dark,341,90);sheet.Save(Path.Combine(folder,"adaptive-preview.png"));
+            }
+        }
+        private static void GatherLanguageText(DependencyObject root, List<string> text)
+        {
+            DependencyProperty[] properties={TextBlock.TextProperty,ContentControl.ContentProperty,HeaderedContentControl.HeaderProperty,HeaderedItemsControl.HeaderProperty,FrameworkElement.ToolTipProperty,AutomationProperties.NameProperty};
+            foreach(DependencyProperty p in properties) { string value=root.GetValue(p) as string;if(value!=null)text.Add(value); }
+            foreach(object child in LogicalTreeHelper.GetChildren(root)){DependencyObject node=child as DependencyObject;if(node!=null)GatherLanguageText(node,text);}
+        }
+        private static void LanguageChecks(StringBuilder report,string folder)
+        {
+            string storage=Path.Combine(folder,"language-settings");Directory.CreateDirectory(storage);
+            Settings c=new Settings{Language="en",Quality="Smooth",Rate=31};c.Save(storage);Settings read=Settings.Read(storage);
+            Assert(read.Language=="en"&&read.Rate==31&&read.Quality=="Smooth","Language persists without changing snow settings",report);
+            SettingsPanel panel=new SettingsPanel(c,delegate{},delegate{},delegate{});UiTheme.Apply(panel,false);
+            SaveControl(panel,308,Path.Combine(folder,"settings-en.png"));
+            List<string> english=new List<string>();GatherLanguageText(panel,english);bool localized=true;
+            foreach(string value in english)if(System.Text.RegularExpressions.Regex.IsMatch(value,"[А-Яа-яЁё]")) {localized=false;report.AppendLine("Untranslated: "+value);}
+            Assert(localized&&english.Contains("Snow settings")&&english.Contains("EN"),"English covers settings, tooltips, accessibility labels and units; EN stays easy to find",report);
+            L10n.Use("ru");SaveControl(panel,308,Path.Combine(folder,"settings-ru.png"));List<string> russian=new List<string>();GatherLanguageText(panel,russian);
+            Assert(russian.Contains("Настройки снега")&&c.Rate==31,"Changing the language updates existing controls without rebuilding or resetting settings",report);
+            L10n.Use("en");Toolbar bar=new Toolbar();bar.Snow.IsChecked=true;bar.Snow.BeginAnimation(SnowSwitch.PositionProperty,null);bar.Snow.SetValue(SnowSwitch.PositionProperty,1.0);bar.ApplyTheme(false);
+            SaveControl((FrameworkElement)bar.Content,152,Path.Combine(folder,"toolbar-new-snowflake.png"));
+            Assert(AutomationProperties.GetName(bar.Snow)=="Snow"&&bar.Snow.IsChecked==true,"The toolbar is translated while its snow switch state is preserved",report);
+            bar.Close();L10n.Use("ru");
+            using(System.Drawing.Bitmap sheet=new System.Drawing.Bitmap(660,535))using(System.Drawing.Graphics g=System.Drawing.Graphics.FromImage(sheet))using(System.Drawing.Font font=new System.Drawing.Font("Segoe UI",11))
+            using(System.Drawing.Image ru=System.Drawing.Image.FromFile(Path.Combine(folder,"settings-ru.png")))using(System.Drawing.Image en=System.Drawing.Image.FromFile(Path.Combine(folder,"settings-en.png")))
+            using(System.Drawing.Image toolbar=System.Drawing.Image.FromFile(Path.Combine(folder,"toolbar-new-snowflake.png")))
+            {
+                g.Clear(System.Drawing.Color.WhiteSmoke);g.DrawString("RU / EN",font,System.Drawing.Brushes.Black,18,12);g.DrawImageUnscaled(toolbar,480,5);g.DrawImageUnscaled(ru,11,60);g.DrawImageUnscaled(en,341,60);sheet.Save(Path.Combine(folder,"language-preview.png"));
             }
         }
         private static double CenterOfMass(Pile pile)

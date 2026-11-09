@@ -13,6 +13,8 @@
 ## Управление
 
 - Свитч справа вверху включает снег. Панель находится на рабочем столе под окнами приложений.
+- **RU / EN** в шапке настроек переключает язык интерфейса. Выбор сохраняется, работающий снег не сбрасывается.
+- Свитч использует простую шестилучевую снежинку с округлыми концами.
 - Цвет панели и настроек автоматически выбирается по фону под ними: черный или белый. Синий индикатор остается синим.
 - Проведите курсором по снегу, чтобы сдвинуть его. Глубокие сугробы сопротивляются сильнее.
 - **Ctrl** подбрасывает две порции в стороны; **Shift** собирает снежок, отпускание со взмахом бросает его.
@@ -41,3 +43,9 @@ $exe = .\Start.ps1 -BuildOnly
 Нативные проверки предназначены для обычного сеанса Windows с рабочим столом Explorer. Проверки включают физику, сохранение массы, ограничения плотности, вывоз снега за экран, темы и прохождение кликов.
 
 Графика снеговичков, елочек и экскаватора создана с помощью imagegen. Оформление элементов — нативная адаптация Spartan UI без браузерного движка.
+
+## English quick start
+
+Download and run [Snow1970.exe](Snow1970.exe?raw=true). No installation, network access or administrator rights are needed. Click the gear in the top-right desktop toolbar, then select **EN** in the settings header. The interface, tooltips and menus switch to English immediately, and the choice is saved.
+
+For source builds, download the whole repository and run **Start.vbs** or **Start.cmd** on Windows. All required artwork is included.
